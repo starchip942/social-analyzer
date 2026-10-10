@@ -783,35 +783,50 @@ class SocialAnalyzer():
             if not self.silent:
                 print(dumps(temp_detected, sort_keys=True, indent=None))
 
-        results_file = getattr(argv, "results", "")
-        if results_file:
-            self.save_results(results_file, argv, temp_detected)
+        results_dir = getattr(argv, "results", "")
+        if results_dir:
+            self.save_results(results_dir, argv, temp_detected)
 
         return temp_detected
 
-    def save_results(self, results_file, argv, temp_detected):
+    def save_results(self, results_dir, argv, temp_detected):
         '''
-        append this run's profiles to one master text file (kept between runs)
+        write one new text file per username for this run into the results folder
         '''
 
-        results_file = path.abspath(path.expanduser(results_file))
-        lines = ["[{}] username: {} | websites: {}".format(strftime("%Y-%m-%d %H:%M:%S"), argv.username, argv.websites)]
+        results_dir = path.abspath(path.expanduser(results_dir))
+        usernames = list(dict.fromkeys(u.strip() for u in argv.username.split(",") if u.strip()))
+        lines_by_user = {username: [] for username in usernames}
         for key in ("detected", "unknown", "failed"):
             for item in temp_detected.get(key, []):
                 link = item.get("link", "")
                 parts = [urlparse(link).netloc, " ".join(filter(None, [item.get("status", ""), item.get("rate", "")])), link]
-                lines.append("  [{}] {}".format(key, " | ".join(filter(None, parts))))
-        if len(lines) == 1:
-            lines.append("  (no profiles)")
+                line = "  [{}] {}".format(key, " | ".join(filter(None, parts)))
+                # a profile belongs to the username in its link (longest match wins, so "john" never takes "johndoe")
+                matches = [u for u in usernames if u.lower() in link.lower()]
+                matches = [u for u in matches if not any(u != o and u.lower() in o.lower() for o in matches)]
+                if not matches and len(usernames) == 1:
+                    matches = usernames
+                for username in matches:
+                    lines_by_user[username].append(line)
         try:
-            makedirs(path.dirname(results_file), exist_ok=True)
-            with open(results_file, "a", encoding="utf-8") as f:
-                f.write("\n".join(lines) + "\n\n")
-            if not self.silent:
-                self.log.info("[Info] Results saved to {}".format(results_file))
+            makedirs(results_dir, exist_ok=True)
         except OSError as e:
             if not self.silent:
-                self.log.info("[Warning] Could not save results to {} ({})".format(results_file, e))
+                self.log.info("[Warning] Could not create results folder {} ({})".format(results_dir, e))
+            return
+        timestamp = strftime("%Y-%m-%d_%H-%M-%S")
+        for username, lines in lines_by_user.items():
+            results_file = path.join(results_dir, "{}_{}.txt".format(resub(r"[^\w.-]", "_", username), timestamp))
+            header = "[{}] username: {} | websites: {}".format(strftime("%Y-%m-%d %H:%M:%S"), username, argv.websites)
+            try:
+                with open(results_file, "w", encoding="utf-8") as f:
+                    f.write("\n".join([header] + (lines or ["  (no profiles)"])) + "\n")
+                if not self.silent:
+                    self.log.info("[Info] Results saved to {}".format(results_file))
+            except OSError as e:
+                if not self.silent:
+                    self.log.info("[Warning] Could not save results to {} ({})".format(results_file, e))
 
     def load_file(self, name, path_to_check, url_download):
         ret = None
@@ -909,7 +924,7 @@ class SocialAnalyzer():
         ARG_PARSER_SETTINGS.add_argument("--headers", help="Headers as dict", metavar="", default={}, type=loads)
         ARG_PARSER_SETTINGS.add_argument("--logs", help="Turn logs on or off", action="store_true")
         ARG_PARSER_SETTINGS.add_argument("--logs_dir", help="Change logs directory", metavar="", default="")
-        ARG_PARSER_SETTINGS.add_argument("--results", help="Text file that each run appends its results to (use \"\" to turn off)", metavar="", default=path.join("~", "Documents", "social-analyzer_results.txt"))
+        ARG_PARSER_SETTINGS.add_argument("--results", help="Folder where each run saves one text file per username (use \"\" to turn off)", metavar="", default=path.join("~", "Documents", "social-analyzer"))
         ARG_PARSER_SETTINGS.add_argument("--timeout", help="Change timeout between each request", metavar="", type=int, default=0)
         ARG_PARSER_SETTINGS.add_argument("--silent", help="Disable output to screen", action="store_true")
 
