@@ -924,7 +924,7 @@ class SocialAnalyzer():
         ARG_PARSER_SETTINGS.add_argument("--headers", help="Headers as dict", metavar="", default={}, type=loads)
         ARG_PARSER_SETTINGS.add_argument("--logs", help="Turn logs on or off", action="store_true")
         ARG_PARSER_SETTINGS.add_argument("--logs_dir", help="Change logs directory", metavar="", default="")
-        ARG_PARSER_SETTINGS.add_argument("--results", help="Folder where each run saves one text file per username (use \"\" to turn off)", metavar="", default=path.join("~", "Documents", "social-analyzer"))
+        ARG_PARSER_SETTINGS.add_argument("--results", help="Folder where each run saves one text file per username (use \"\" to turn off)", metavar="", default=path.join("~", "Documents", "social-analyzer", "outputs"))
         ARG_PARSER_SETTINGS.add_argument("--timeout", help="Change timeout between each request", metavar="", type=int, default=0)
         ARG_PARSER_SETTINGS.add_argument("--silent", help="Disable output to screen", action="store_true")
 
